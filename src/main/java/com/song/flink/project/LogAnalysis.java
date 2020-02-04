@@ -118,7 +118,7 @@ public class LogAnalysis {
                          *      第二个参数：域名
                          *      第三个参数：traffic的和
                          */
-                        String domain = tuple.getField(1).toString();
+                        String domain = tuple.getField(0).toString();
                         Long sum = 0L;
                         String currnetTime = "";
 
