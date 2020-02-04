@@ -4,6 +4,7 @@ import com.song.flink.project.constant.KafkaConstant;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -17,15 +18,20 @@ import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+import org.apache.flink.streaming.connectors.elasticsearch.ElasticsearchSinkFunction;
+import org.apache.flink.streaming.connectors.elasticsearch.RequestIndexer;
+import org.apache.flink.streaming.connectors.elasticsearch6.ElasticsearchSink;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.StringUtils;
+import org.apache.http.HttpHost;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.client.Requests;
 import scala.Tuple4;
 
 import javax.annotation.Nullable;
 import java.text.SimpleDateFormat;
-import java.util.Iterator;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * @author songshiyu
@@ -69,6 +75,7 @@ public class LogAnalysis {
                         return tuple4;
                     }
                 }).filter(new FilterFunction<Tuple4<String, Long, String, String>>() {
+                    @Override
                     public boolean filter(Tuple4<String, Long, String, String> tuple4) throws Exception {
                         if (tuple4._2() != 0 && "M".equalsIgnoreCase(tuple4._1())) {
                             return true;
@@ -76,6 +83,7 @@ public class LogAnalysis {
                         return false;
                     }
                 }).map(new MapFunction<Tuple4<String, Long, String, String>, Tuple3<Long, String, Long>>() {
+                    @Override
                     public Tuple3<Long, String, Long> map(Tuple4<String, Long, String, String> tuple4) throws Exception {
                         return new Tuple3<Long, String, Long>(tuple4._2(), tuple4._3(), Long.parseLong(tuple4._4()));
                     }
@@ -87,6 +95,7 @@ public class LogAnalysis {
             Long maxOutOfOrderness = 10000L;
             Long currnetMaxTimestamp = 0L;
 
+            @Override
             public long extractTimestamp(Tuple3<Long, String, Long> element, long previousElementTimestamp) {
                 Long timestamp = element.f0;
                 currnetMaxTimestamp = Math.max(timestamp, previousElementTimestamp);
@@ -94,12 +103,14 @@ public class LogAnalysis {
             }
 
             @Nullable
+            @Override
             public Watermark getCurrentWatermark() {
                 return new Watermark(currnetMaxTimestamp - maxOutOfOrderness);
             }
         }).keyBy(1)
                 .window(TumblingEventTimeWindows.of(Time.seconds(60)))
                 .apply(new WindowFunction<Tuple3<Long, String, Long>, Tuple3<String, String, Long>, Tuple, TimeWindow>() {
+                    @Override
                     public void apply(Tuple tuple, TimeWindow window, Iterable<Tuple3<Long, String, Long>> input, Collector<Tuple3<String, String, Long>> out) throws Exception {
                         /**
                          * 输出：
@@ -124,6 +135,40 @@ public class LogAnalysis {
                         out.collect(new Tuple3<String, String, Long>(currnetTime, domain, sum));
                     }
                 });
+
+        /**
+         * 添加ES Sink
+         * */
+        List<HttpHost> httpHosts = new ArrayList<HttpHost>();
+        httpHosts.add(new HttpHost("192.168.137.10", 9200, "http"));
+
+        ElasticsearchSink.Builder<Tuple3<String, String, Long>> esSinkBuilder = new ElasticsearchSink.Builder<Tuple3<String, String, Long>>(
+                httpHosts,
+                new ElasticsearchSinkFunction<Tuple3<String, String, Long>>() {
+
+                    @Override
+                    public void process(Tuple3<String, String, Long> longStringLongTuple3, RuntimeContext runtimeContext, RequestIndexer requestIndexer) {
+                        requestIndexer.add(createIndexRequest(longStringLongTuple3));
+                    }
+
+                    public IndexRequest createIndexRequest(Tuple3<String, String, Long> element) {
+                        Map<String, Object> json = new HashMap<String, Object>();
+                        json.put("time", element.f0);
+                        json.put("domain", element.f1);
+                        json.put("traffic", element.f2);
+
+                        String id = element.f0 + "-" + element.f1;
+
+                        return Requests.indexRequest()
+                                .index("cdh")
+                                .type("traffic")
+                                .id(id)
+                                .source(json);
+                    }
+                }
+        );
+
+        apply.addSink(esSinkBuilder.build());
 
         apply.print().setParallelism(1);
 
