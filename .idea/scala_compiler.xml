@@ -4,7 +4,7 @@
     <profile name="Maven 1" modules="bigdataFlink">
       <parameters>
         <parameter value="-dependencyfile" />
-        <parameter value="E:\IDEA\idea_workplace\bigdataFlink\target/.scala_dependencies" />
+        <parameter value="E:\工作软件\workplace\bigdataFlink\target/.scala_dependencies" />
       </parameters>
     </profile>
   </component>
