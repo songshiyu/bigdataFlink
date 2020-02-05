@@ -51,6 +51,7 @@ public class Sink2Mysql extends RichSinkFunction<Student>{
     }
 
     // 每条记录插入时调用一次
+    @Override
     public void invoke(Student value, Context context) throws Exception {
         System.out.println("invoke~~~~~~~~~");
         // 未前面的占位符赋值
