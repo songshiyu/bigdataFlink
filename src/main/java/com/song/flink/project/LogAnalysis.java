@@ -36,6 +36,13 @@ import java.util.*;
 /**
  * @author songshiyu
  * @date 2020/2/3 15:18
+ *
+ *  读取kafka的数据
+ *  读取mysql的数据
+ *  connect
+ *
+ *  业务逻辑的处理分析：水印  WindowFunction
+ *  ==》 ES 注意数据类型
  **/
 @Slf4j
 public class LogAnalysis {

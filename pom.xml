@@ -10,7 +10,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.7.0</flink.version>
+        <flink.version>1.7.2</flink.version>
         <scala.binary.version>2.11</scala.binary.version>
         <scala.version>2.11.12</scala.version>
         <hadoop.version>2.8.1</hadoop.version>
@@ -95,6 +95,19 @@
             <artifactId>flink-connector-elasticsearch6_2.11</artifactId>
             <version>${flink.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-hadoop-compatibility_2.11</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-hbase_2.12</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
